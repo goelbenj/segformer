@@ -99,7 +99,9 @@ class SegformerFinetuner(pl.LightningModule):
             align_corners=False
         )
 
-        predicted = upsampled_logits > self.threshold
+        # apply threshold
+        predicted = upsampled_logits <= self.threshold
+        predicted = (predicted * 255).squeeze(dim=1)
 
         self.train_mean_iou.add_batch(
             predictions=predicted.detach().cpu().numpy(), 
@@ -130,14 +132,19 @@ class SegformerFinetuner(pl.LightningModule):
         
         loss, logits = outputs[0], outputs[1]
         
+        # apply sigmoid
+        logits = nn.functional.sigmoid(logits)
+        
         upsampled_logits = nn.functional.interpolate(
             logits, 
             size=masks.shape[-2:], 
             mode="bilinear", 
             align_corners=False
         )
-        
-        predicted = upsampled_logits.argmax(dim=1)
+
+        # apply threshold
+        predicted = upsampled_logits <= self.threshold
+        predicted = (predicted * 255).squeeze(dim=1)
         
         self.val_mean_iou.add_batch(
             predictions=predicted.detach().cpu().numpy(), 
@@ -174,14 +181,19 @@ class SegformerFinetuner(pl.LightningModule):
         
         loss, logits = outputs[0], outputs[1]
         
+        # apply sigmoid
+        logits = nn.functional.sigmoid(logits)
+        
         upsampled_logits = nn.functional.interpolate(
             logits, 
             size=masks.shape[-2:], 
             mode="bilinear", 
             align_corners=False
         )
-        
-        predicted = upsampled_logits.argmax(dim=1)
+
+        # apply threshold
+        predicted = upsampled_logits <= self.threshold
+        predicted = (predicted * 255).squeeze(dim=1)
         
         self.test_mean_iou.add_batch(
             predictions=predicted.detach().cpu().numpy(), 
@@ -267,7 +279,8 @@ if __name__ == "__main__":
     logger = TensorBoardLogger('.')
 
     trainer = pl.Trainer(
-        callbacks=[early_stop_callback, checkpoint_callback],
+        # callbacks=[early_stop_callback, checkpoint_callback],
+        callbacks=[checkpoint_callback],
         max_epochs=500,
         val_check_interval=len(train_dataloader),
         logger=logger
